@@ -1,0 +1,15 @@
+Drumstick Input Method 1.0.0 - Rime CMake target fix
+
+Modified:
+- scripts/build-rime-native.sh
+
+Fix:
+- Removed unsafe regex deletion/injection order.
+- Ensured add_library(librime) exists before target_link_libraries.
+- Added stable DRUMSTICK JNI target marker.
+- Kept static librime linking:
+  rime-static -> liblibrime.so
+
+Reason:
+Previous build failed:
+Cannot specify link libraries for target "librime" which is not built by this project.

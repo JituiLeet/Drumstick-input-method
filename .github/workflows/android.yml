@@ -1,0 +1,74 @@
+name: Build Android APK
+
+# Do not start Actions automatically when project files are modified.
+# Build only when the user explicitly starts this workflow.
+on:
+  workflow_dispatch:
+
+env:
+  TRIME_REF: develop
+  ANDROID_NDK_VERSION: 23.2.8568313
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android toolchain
+        run: |
+          sdkmanager "platforms;android-35" "build-tools;35.0.0" "cmake;3.22.1" "ndk;${ANDROID_NDK_VERSION}"
+          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/${ANDROID_NDK_VERSION}" >> "$GITHUB_ENV"
+
+      - name: Cache Rime native build
+        uses: actions/cache@v4
+        with:
+          path: |
+            .rime-build/trime
+            app/src/main/jniLibs
+          key: rime-${{ runner.os }}-${{ env.TRIME_REF }}-${{ hashFiles('scripts/build-rime-native.sh') }}
+
+      - name: Build Rime native library for TV ABIs
+        run: bash scripts/build-rime-native.sh
+        env:
+          TRIME_REF: ${{ env.TRIME_REF }}
+
+      - name: Fetch open-source Rime data
+        run: bash scripts/fetch-rime-data.sh
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10'
+
+      - name: Build debug APK
+        run: gradle :app:assembleDebug --stacktrace
+
+      - name: Verify native linkage and APK contents
+        run: |
+          set -euo pipefail
+          APK=$(find app/build/outputs/apk/debug -name '*.apk' | head -n1)
+          test -n "$APK"
+          unzip -l "$APK" | grep 'lib/armeabi-v7a/liblibrime.so'
+          unzip -l "$APK" | grep 'lib/arm64-v8a/liblibrime.so'
+          if unzip -l "$APK" | grep -Eq '(^|/)librime\.so$'; then echo 'Unexpected separate librime.so dependency'; exit 1; fi
+          unzip -p "$APK" lib/arm64-v8a/liblibrime.so > /tmp/liblibrime.so
+          "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" -Ws /tmp/liblibrime.so | grep ' rime_get_api$'
+          ! "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" -d /tmp/liblibrime.so | grep -Eq 'Shared library: \[librime\.so\]'
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: drumstick-input-method-debug
+          path: app/build/outputs/apk/debug/*.apk
+

@@ -1,0 +1,6 @@
+config_version: "1.0"
+# 鸡腿输入法默认 Rime 配置入口。
+# 正式构建时可由 scripts/fetch-rime-data.sh 拉取完整开源方案。
+patch:
+  schema_list:
+    - schema: luna_pinyin_simp
