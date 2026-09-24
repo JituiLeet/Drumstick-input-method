@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">鸡腿输入法</string>
+    <string name="ime_name">鸡腿输入法</string>
+    <string name="ime_english_name">Drumstick Input Method</string>
+    <string name="ime_subtype_zh">中文（简体）</string>
+    <string name="ime_subtype_en">English</string>
+    <string name="accessibility_service_name">鸡腿输入法屏幕文字复制服务</string>
+    <string name="accessibility_service_description">仅在你主动使用“复制”功能时读取其他应用界面中可访问的文字，用于选择并复制屏幕文字。</string>
+</resources>

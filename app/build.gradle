@@ -1,0 +1,32 @@
+plugins { id 'com.android.application' version '8.7.3' }
+
+android {
+    namespace 'com.jituileet.inputmethod'
+    compileSdk 35
+    ndkVersion "23.2.8568313"
+
+    defaultConfig {
+        applicationId 'com.jituileet.inputmethod'
+        minSdk 19
+        targetSdk 34
+        versionCode 100
+        versionName '1.0.0'
+        ndk { abiFilters 'armeabi-v7a', 'arm64-v8a' }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+
+    sourceSets {
+        main { assets.srcDirs = ['src/main/assets'] }
+    }
+
+    packagingOptions {
+        resources.excludes += ['META-INF/NOTICE', 'META-INF/LICENSE', 'META-INF/DEPENDENCIES']
+    }
+}
+
+dependencies { }

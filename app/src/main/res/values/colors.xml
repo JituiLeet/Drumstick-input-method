@@ -1,0 +1,7 @@
+<resources>
+    <color name="drumstick_default">#EBECF0</color>
+    <color name="drumstick_dark">#202124</color>
+    <color name="drumstick_text">#202124</color>
+    <color name="drumstick_dark_text">#F1F3F4</color>
+    <color name="drumstick_accent">#58B9B9</color>
+</resources>

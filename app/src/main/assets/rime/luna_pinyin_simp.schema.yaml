@@ -1,0 +1,74 @@
+schema:
+  schema_id: luna_pinyin_simp
+  name: 朙月拼音·简化字
+  version: "0.1"
+  author:
+    - 佛振 <fro@rime.im>
+  description: >-
+    鸡腿输入法使用的 Rime 简体拼音方案入口。
+  dependencies: []
+
+switches:
+  - name: ascii_mode
+    reset: 0
+    states: [中文, 西文]
+
+engine:
+  processors:
+    - ascii_composer
+    - recognizer
+    - key_binder
+    - speller
+    - punctuator
+    - selector
+    - navigator
+  segmentors:
+    - ascii_segmentor
+    - matcher
+    - abc_segmentor
+    - punct_segmentor
+    - fallback_segmentor
+  translators:
+    - punct_translator
+    - table_translator@custom_phrase
+    - table_translator
+  filters:
+    - simplifier
+    - uniquifier
+
+speller:
+  alphabet: zyxwvutsrqponmlkjihgfedcba
+  delimiter: " '"
+  algebra:
+    - erase/^xx$/
+
+translator:
+  dictionary: luna_pinyin
+  prism: luna_pinyin_simp
+  enable_user_dict: true
+  enable_sentence: true
+
+custom_phrase:
+  dictionary: ""
+  user_dict: custom_phrase
+  db_class: stabledb
+  enable_completion: false
+  initial_quality: 1
+
+punctuator:
+  full_shape:
+    " ": {commit: "　"}
+    ",": {commit: ，}
+    ".": {commit: 。}
+  half_shape:
+    ",": {commit: ，}
+    ".": {commit: 。}
+
+key_binder:
+  import_preset: default
+
+recognizer:
+  import_preset: default
+  patterns:
+    punct: "^/[A-Za-z]*$"
+    uppercase: "^[A-Z][-_+~.@0-9A-Za-z]*$"
