@@ -5,15 +5,32 @@ import android.app.*;import android.content.*;import android.graphics.Color;impo
 /** TV-friendly settings. Every action is reachable with a D-pad/OK remote. */
 public class SettingsActivity extends Activity {
     LinearLayout root; boolean zh;
+    private final ArrayList<Button> focusButtons=new ArrayList<>();
     @Override public void onCreate(Bundle b){super.onCreate(b); zh=Prefs.language(this).equals("zh") || (Prefs.language(this).equals("auto") && Locale.getDefault().getLanguage().equals("zh")); if(getIntent().getBooleanExtra("open_dictionary",false)){ pickDict(); return; } build();}
     private TextView title(String t){TextView v=new TextView(this);v.setText(t);v.setTextSize(20);v.setTextColor(Prefs.dark(this)?0xFFF1F3F4:0xFF202124);v.setPadding(22,24,22,18);return v;}
     private void build(){
-        root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setFocusable(true);root.setBackgroundColor(Prefs.dark(this)?0xFF202124:Color.WHITE);setContentView(root);
+        root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setFocusable(false);root.setBackgroundColor(Prefs.dark(this)?0xFF202124:Color.WHITE);setContentView(root);
         root.addView(title(zh?"鸡腿输入法设置":"Drumstick Input Method Settings"));
         addButton(zh?"更改外观":"Appearance",v->appearance());addButton(zh?"更改词库":"Dictionary",v->dictionary());addButton(zh?"语言":"Language",v->language());addButton(zh?"键盘":"Keyboard",v->keyboard());addButton(zh?"使用手机输入":"Use phone input",v->phone());addButton(zh?"打开系统输入法设置":"Open system IME settings",v->startActivity(new Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)));
-        TextView about=title("\n鸡腿输入法\nDrumstick Input Method\ncom.jituileet.inputmethod\nAndroid 4.4–14 · Rime");about.setTextSize(14);root.addView(about);
+        TextView about=title("\n鸡腿输入法\nDrumstick Input Method\ncom.jituileet.inputmethod\nAndroid 4.4–14 · Rime");about.setTextSize(14);root.addView(about);wireVerticalFocus();
     }
-    private void addButton(String s,View.OnClickListener l){Button b=new Button(this);b.setAllCaps(false);b.setText(s);b.setTextSize(17);b.setFocusable(true);b.setOnClickListener(l);root.addView(b,new LinearLayout.LayoutParams(-1,64));}
+    private void addButton(String s,View.OnClickListener l){
+        Button b=new Button(this);
+        b.setId(View.generateViewId());
+        b.setAllCaps(false); b.setText(s); b.setTextSize(17); b.setFocusable(true); b.setOnClickListener(l);
+        root.addView(b,new LinearLayout.LayoutParams(-1,64));
+        focusButtons.add(b);
+    }
+    private void wireVerticalFocus(){
+        for(int i=0;i<focusButtons.size();i++){
+            Button b=focusButtons.get(i);
+            b.setNextFocusUpId(focusButtons.get(i>0?i-1:i).getId());
+            b.setNextFocusDownId(focusButtons.get(i+1<focusButtons.size()?i+1:i).getId());
+            // A single-column TV settings page has no meaningful horizontal neighbour.
+            b.setNextFocusLeftId(b.getId());
+            b.setNextFocusRightId(b.getId());
+        }
+    }
     private AlertDialog dialog(String title, View body){AlertDialog d=new AlertDialog.Builder(this).setTitle(title).setView(body).setNegativeButton(zh?"返回":"Back",null).create();d.setOnShowListener(x->{Button n=d.getButton(AlertDialog.BUTTON_NEGATIVE);if(n!=null)n.setFocusable(true);});return d;}
     private void appearance(){ final String[] colors={"默认浅灰","蓝灰","绿色","紫色","黑色"};final int[] vals={0xFFEBECF0,0xFFE6EDF5,0xFFE6F1EE,0xFFECE7F5,0xFF202124};LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);for(int i=0;i<colors.length;i++){final int k=i;Button b=new Button(this);b.setText(zh?colors[i]:new String[]{"Default light gray","Blue gray","Green","Purple","Black"}[i]);b.setAllCaps(false);b.setFocusable(true);b.setOnClickListener(v->{Prefs.color(this,vals[k]);recreate();});box.addView(b,new LinearLayout.LayoutParams(-1,58));}Switch dark=new Switch(this);dark.setText(zh?"深色模式":"Dark mode");dark.setFocusable(true);dark.setChecked(Prefs.dark(this));box.addView(dark);Button reset=new Button(this);reset.setText(zh?"恢复默认外观":"Restore default appearance");reset.setFocusable(true);reset.setOnClickListener(v->{Prefs.color(this,0xFFEBECF0);Prefs.dark(this,false);recreate();});box.addView(reset);dialog(zh?"更改外观":"Appearance",box).show();}
     private void dictionary(){final ArrayList<String> items=new ArrayList<>();items.add(zh?"输入法自带词库":"Built-in dictionary");File dir=new File(getFilesDir(),"dicts");if(dir.exists()&&dir.listFiles()!=null)for(File f:dir.listFiles())items.add(f.getName());LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);for(String item:items){final String name=item;Button b=new Button(this);b.setText(name);b.setAllCaps(false);b.setFocusable(true);b.setOnClickListener(v->{Prefs.dict(this,name);try{RimeData.selectDictionary(this,name);}catch(Exception ignored){}sendReload();Toast.makeText(this,zh?"词库已切换":"Dictionary selected",Toast.LENGTH_SHORT).show();});box.addView(b,new LinearLayout.LayoutParams(-1,60));}Button upload=new Button(this);upload.setText(zh?"上传词库文件（.dict.yaml）":"Upload dictionary (.dict.yaml)");upload.setFocusable(true);upload.setOnClickListener(v->pickDict());box.addView(upload,new LinearLayout.LayoutParams(-1,60));dialog(zh?"更改词库":"Dictionary",box).show();}

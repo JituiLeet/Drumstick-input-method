@@ -85,20 +85,12 @@ public final class ImeSettingsPanel extends ScrollView {
     @Override public boolean dispatchKeyEvent(KeyEvent e){
         if(e.getAction()!=KeyEvent.ACTION_DOWN) return true;
         int k=e.getKeyCode();
-        if(k==KeyEvent.KEYCODE_DPAD_CENTER || k==KeyEvent.KEYCODE_ENTER){ View f=findFocus(); if(f!=null && f.isClickable()){ f.performClick(); return true; } return true; }
-        int dir=k==KeyEvent.KEYCODE_DPAD_UP?View.FOCUS_UP:k==KeyEvent.KEYCODE_DPAD_DOWN?View.FOCUS_DOWN:k==KeyEvent.KEYCODE_DPAD_LEFT?View.FOCUS_LEFT:k==KeyEvent.KEYCODE_DPAD_RIGHT?View.FOCUS_RIGHT:0;
-        if(dir!=0){ View f=findFocus(); if(f==null) f=this; View n=f.focusSearch(dir); if(n!=null){n.requestFocus(); return true;} }
-        return super.dispatchKeyEvent(e);
-    }
-
-    @Override public View focusSearch(int direction){
-        View f=findFocus();
-        View n=null;
-        if(f!=null){
-            n=super.focusSearch(direction);
+        if(k==KeyEvent.KEYCODE_DPAD_CENTER || k==KeyEvent.KEYCODE_ENTER){
+            View f=findFocus();
+            if(f!=null && f.isClickable()){f.performClick();return true;}
+            return true;
         }
-        if(n!=null) return n;
-        return f==null?this:f;
+        return super.dispatchKeyEvent(e);
     }
 
 }

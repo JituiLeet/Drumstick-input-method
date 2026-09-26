@@ -2,6 +2,19 @@
 
 Android TV 输入法项目，包名：`com.jituileet.inputmethod`。
 
+## 1.0.0 TV 输入修复
+
+本修订保持版本号 `1.0.0` 不变，针对 Android TV 遥控器和软键盘输入路径修复：
+
+- 中文拼音输入改为通过 JNI `set_input` 直接更新 Rime composition，避免电视软键盘字母无法进入 Rime 的问题。
+- Rime 不可用时，内置 `luna_pinyin` 词库提供可用的本地候选词回退。
+- 26 键与 9 键共用同一个中英文状态；中/英键在有拼音预输入时也仍然执行中英文切换。
+- 9 键 `?123` 可稳定进入符号/数字页，数字页的 `ABC` 返回 9 键。
+- 26 键和 9 键同一行的左右移动支持首尾循环。
+- 26 键上下移动到顶部工具栏时按屏幕实际位置匹配，不再把一整行错误地跳到“隐藏输入法”。
+- 设置、语言、键盘模式、标点选择等 IME 内面板统一使用空间焦点算法，并排除面板根节点，修复遥控器上下焦点跳回第一个按钮的问题。
+- 已更新 Rime 数据安装标记，安装修订版后会重新部署新的内置配置。
+
 ## 当前状态
 
 **Rime 已正式接入。** `ChineseEngine` 不再把“候选词数组”作为主实现；运行时优先加载 ABI 对应的 `liblibrime.so`，通过 JNI 调用 Rime session、composition、candidate、selection、ASCII mode 和 deployment API。只有在 native runtime 没有被构建/打包时，开发环境才使用一个极小的 fallback，避免前端工程无法启动。

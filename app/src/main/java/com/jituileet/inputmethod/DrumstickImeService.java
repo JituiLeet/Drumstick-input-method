@@ -172,26 +172,56 @@ public class DrumstickImeService extends InputMethodService {
     }
 
     private View spatialPanelFocus(View root, View current, int direction){
-        java.util.ArrayList<View> list=new java.util.ArrayList<>(); collectFocusable(root,list);
-        android.graphics.Rect a=new android.graphics.Rect(); current.getGlobalVisibleRect(a); float ax=a.centerX(), ay=a.centerY();
+        java.util.ArrayList<View> list=new java.util.ArrayList<>();
+        collectFocusable(root,list,root);
+        android.graphics.Rect a=new android.graphics.Rect(); current.getGlobalVisibleRect(a);
+        float ax=a.centerX(), ay=a.centerY();
         View best=null; double bestScore=Double.MAX_VALUE;
-        for(View v:list){ if(v==current||v.getVisibility()!=View.VISIBLE||!v.isFocusable())continue; android.graphics.Rect b=new android.graphics.Rect();v.getGlobalVisibleRect(b);float bx=b.centerX(),by=b.centerY();float dx=bx-ax,dy=by-ay;
-            boolean ok=direction==View.FOCUS_LEFT?dx<-2:direction==View.FOCUS_RIGHT?dx>2:direction==View.FOCUS_UP?dy<-2:dy>2; if(!ok)continue;
+        for(View v:list){
+            if(v==current || v.getVisibility()!=View.VISIBLE || !v.isFocusable()) continue;
+            android.graphics.Rect b=new android.graphics.Rect(); v.getGlobalVisibleRect(b);
+            float bx=b.centerX(), by=b.centerY(); float dx=bx-ax, dy=by-ay;
+            boolean ok=direction==View.FOCUS_LEFT?dx<-2:direction==View.FOCUS_RIGHT?dx>2:direction==View.FOCUS_UP?dy<-2:dy>2;
+            if(!ok) continue;
             double primary=(direction==View.FOCUS_LEFT||direction==View.FOCUS_RIGHT)?Math.abs(dx):Math.abs(dy);
             double cross=(direction==View.FOCUS_LEFT||direction==View.FOCUS_RIGHT)?Math.abs(dy):Math.abs(dx);
-            double score=primary*primary+cross*cross*0.35;
+            // Strongly prefer a button in the same visual row/column.
+            double score=primary*primary+cross*cross*0.18;
             if(score<bestScore){bestScore=score;best=v;}
         }
-        return best;
+        if(best!=null) return best;
+
+        // Horizontal navigation wraps within the nearest visual row.
+        if(direction==View.FOCUS_LEFT || direction==View.FOCUS_RIGHT){
+            double bestRow=Double.MAX_VALUE; View wrap=null;
+            for(View v:list){
+                if(v==current || v.getVisibility()!=View.VISIBLE || !v.isFocusable()) continue;
+                android.graphics.Rect b=new android.graphics.Rect(); v.getGlobalVisibleRect(b);
+                float dy=Math.abs(b.centerY()-ay);
+                if(dy>Math.max(48f,a.height()*1.8f)) continue;
+                float bx=b.centerX();
+                boolean edge=direction==View.FOCUS_LEFT?bx>ax:bx<ax;
+                if(!edge) continue;
+                double score=dy*dy+Math.abs(bx-ax)*0.05;
+                if(score<bestRow){bestRow=score;wrap=v;}
+            }
+            if(wrap!=null) return wrap;
+        }
+        return null;
     }
-    
-    // FIXED: Removed invalid comparison v != this
-    private void collectFocusable(View v, java.util.ArrayList<View> out){
-        if(v != null && v.isFocusable()) out.add(v);
-        if(v instanceof android.view.ViewGroup){android.view.ViewGroup g=(android.view.ViewGroup)v;for(int i=0;i<g.getChildCount();i++)collectFocusable(g.getChildAt(i),out);}
+
+    private void collectFocusable(View v, java.util.ArrayList<View> out, View root){
+        if(v!=null && v!=root && v.isFocusable()) out.add(v);
+        if(v instanceof android.view.ViewGroup){
+            android.view.ViewGroup g=(android.view.ViewGroup)v;
+            for(int i=0;i<g.getChildCount();i++) collectFocusable(g.getChildAt(i),out,root);
+        }
     }
     private void ensurePanelVisible(View v){
-        if(activePanel instanceof android.widget.ScrollView){ android.graphics.Rect r=new android.graphics.Rect();v.getDrawingRect(r);((android.widget.ScrollView)activePanel).requestChildRectangleOnScreen(v,r,true); }
+        if(activePanel instanceof android.widget.ScrollView){
+            android.graphics.Rect r=new android.graphics.Rect(); v.getDrawingRect(r);
+            ((android.widget.ScrollView)activePanel).requestChildRectangleOnScreen(v,r,true);
+        }
     }
 
     @Override public boolean onKeyUp(int keyCode, KeyEvent event){
@@ -277,7 +307,9 @@ public class DrumstickImeService extends InputMethodService {
         if(label.equals("空格")){ if(engine.isEnglish()) commitText(" "); else if(engine.hasComposing()){ String out=engine.commitFirst(); if(out!=null&&!out.isEmpty()) commitText(out); } else commitText(" "); return; }
         if(label.equals("回车") || label.equals("↵")){ if(!engine.isEnglish()&&engine.hasComposing()){String out=engine.commitFirst();if(out!=null&&!out.isEmpty())commitText(out);} ic.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_ENTER)); ic.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP,KeyEvent.KEYCODE_ENTER)); return; }
         if(label.equals("中/英")){
-            if(!engine.isEnglish() && engine.hasComposing()){ splitPinyin(); return; }
+            // One shared language state for both 26-key and 9-key layouts.
+            // Switching is always a switch; it must not become a different action
+            // just because a pinyin composition is currently visible.
             try{InputConnection x=getCurrentInputConnection();if(x!=null)x.finishComposingText();}catch(Throwable ignored){}
             engine.setEnglish(!engine.isEnglish());
             if(view!=null) view.invalidate();
@@ -289,10 +321,21 @@ public class DrumstickImeService extends InputMethodService {
         if(label.equals("英123")){ engine.setEnglish(true); numericMode=true; if(view!=null)view.setNumericMode(true); return; }
         if(label.equals("符号")){ numericMode=true; if(view!=null)view.setNumericMode(true); return; }
         if(label.equals("搜索")){ if(!engine.isEnglish()&&engine.hasComposing()){String out=engine.commitFirst();if(out!=null&&!out.isEmpty())commitText(out);} return; }
-        if(label.equals("ABC")||label.equals("DEF")||label.equals("GHI")||label.equals("JKL")||label.equals("MNO")||label.equals("PQRS")||label.equals("TUV")||label.equals("WXYZ")){ if(!engine.isEnglish()){ engine.input(label.substring(0,1).toLowerCase(java.util.Locale.ROOT)); } else { commitText(label.substring(0,1)); } return; }
         if(label.equals("🌐")){ showKeyboardModePanel(); return; }
-        if(label.equals("?123")){ numericMode=!numericMode; if(view!=null)view.setNumericMode(numericMode); return; }
-        if(label.equals("ABC")){ numericMode=false; if(view!=null)view.setNumericMode(false); return; }
+        if(label.equals("?123")){
+            numericMode=true;
+            if(view!=null)view.setNumericMode(true);
+            return;
+        }
+        if(label.equals("ABC") && view!=null && view.isNumericMode()){
+            numericMode=false;
+            view.setNumericMode(false);
+            return;
+        }
+        if(label.equals("ABC")||label.equals("DEF")||label.equals("GHI")||label.equals("JKL")||label.equals("MNO")||label.equals("PQRS")||label.equals("TUV")||label.equals("WXYZ")){
+            if(!engine.isEnglish()){ engine.input(label.substring(0,1).toLowerCase(java.util.Locale.ROOT)); } else { commitText(label.substring(0,1)); }
+            return;
+        }
         if(label.equals("表情")||label.equals("Emoji")){ if(view!=null)view.setEmojiMode(true); return; }
         if(label.equals("，")||label.equals("。")||label.equals(",")||label.equals(".")){ if(!engine.isEnglish()&&engine.hasComposing()){String out=engine.commitFirst();if(out!=null&&!out.isEmpty())commitText(out);} commitText(label); return; }
         if(label.equals("Shift")){ engine.setEnglish(!engine.isEnglish()); view.invalidate(); return; }

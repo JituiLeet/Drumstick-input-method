@@ -23,13 +23,13 @@ public final class RimeData {
         File user = userDir(c);
 
         if (!shared.exists() ||
-                !new File(shared, ".installed-1.0.0-rime-fix2").exists()) {
+                !new File(shared, ".installed-1.0.0-rime-tv-fix3").exists()) {
 
             delete(shared);
 
             copyAssetTree(c, "rime", shared);
 
-            new File(shared, ".installed-1.0.0-rime-fix2").createNewFile();
+            new File(shared, ".installed-1.0.0-rime-tv-fix3").createNewFile();
         }
 
         if (!user.exists()) {

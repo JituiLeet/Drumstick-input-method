@@ -26,20 +26,15 @@ public final class ImeKeyboardModePanel extends ScrollView {
     }
     private void add(String text,int mode){Button b=new Button(service);b.setText(text);b.setAllCaps(false);b.setTextSize(20);b.setFocusable(true);b.setOnClickListener(v->{service.selectKeyboardMode(mode);});box.addView(b,new LinearLayout.LayoutParams(-1,76));}
     @Override public boolean dispatchKeyEvent(KeyEvent e){
-        if(e.getAction()!=KeyEvent.ACTION_DOWN)return true;
+        if(e.getAction()!=KeyEvent.ACTION_DOWN) return true;
         int k=e.getKeyCode();
-        if(k==KeyEvent.KEYCODE_DPAD_CENTER||k==KeyEvent.KEYCODE_ENTER){View f=findFocus();if(f!=null&&f.isClickable()){f.performClick();return true;}return true;}
-        if(k==KeyEvent.KEYCODE_DPAD_UP||k==KeyEvent.KEYCODE_DPAD_DOWN){View f=findFocus();if(f==null)f=this;View n=f.focusSearch(k==KeyEvent.KEYCODE_DPAD_UP?View.FOCUS_UP:View.FOCUS_DOWN);if(n!=null){n.requestFocus();return true;}return true;}
-        return super.dispatchKeyEvent(e);
-    }
-    @Override public View focusSearch(int direction){
-        View f=findFocus();
-        View n=null;
-        if(f!=null){
-            n=super.focusSearch(direction);
+        if(k==KeyEvent.KEYCODE_DPAD_CENTER || k==KeyEvent.KEYCODE_ENTER){
+            View f=findFocus();
+            if(f!=null && f.isClickable()){f.performClick();return true;}
+            return true;
         }
-        if(n!=null) return n;
-        return f==null?this:f;
+        if(k==KeyEvent.KEYCODE_BACK){service.restoreKeyboardView();return true;}
+        return super.dispatchKeyEvent(e);
     }
 
 }

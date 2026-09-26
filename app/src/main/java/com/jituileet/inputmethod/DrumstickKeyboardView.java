@@ -76,10 +76,13 @@ public final class DrumstickKeyboardView extends View {
     }
 
     private String displayKey(String key){
-        if(key.equals("中/英") && !engineChinese()) return "中/英";
-        if(key.equals("中/英") && engineChinese() && !preedit.isEmpty()) return "分词";
+        // The 26-key and 9-key layouts share the same Chinese/English state.
+        // Never turn the switch into a different "split pinyin" action merely
+        // because a composition is active.
         return key;
     }
+    public boolean isNumericMode(){ return numericMode; }
+    public boolean isEmojiMode(){ return emojiMode; }
     private boolean engineChinese(){ return svc.isChineseInputMode(); }
     private void drawRow(Canvas c,String[] rowKeys,float y,float rh,int r){
         float gap=4,total=getWidth()-gap*(rowKeys.length+1),kw=total/rowKeys.length,xx=gap;
@@ -179,8 +182,18 @@ public final class DrumstickKeyboardView extends View {
     }
     private int sevenBottomLength(){ return nineBottom.length; }
 
-    private int toolForKey(int keyCol){int n=tools().length;return Math.max(0,Math.min(n-1,Math.round(keyCol*(n-1)/9f)));}
-    private int keyForTool(int tool){int n=9;return Math.max(0,Math.min(n-1,Math.round(tool*9f/Math.max(1,tools().length-1))));}
+    private int toolForKey(int keyCol){
+        int n=tools().length;
+        if(n<=1)return 0;
+        float center=(keyCol+0.5f)/10f;
+        return Math.max(0,Math.min(n-1,(int)Math.floor(center*n)));
+    }
+    private int keyForTool(int tool){
+        int n=10, t=tools().length;
+        if(t<=1)return 0;
+        float center=(tool+0.5f)/t;
+        return Math.max(0,Math.min(n-1,Math.round(center*n-0.5f)));
+    }
 
     private void moveHorizontal(int d){
         if(section==0){col=Math.max(0,Math.min(tools().length-1,col+d));return;}
@@ -188,23 +201,28 @@ public final class DrumstickKeyboardView extends View {
         if(Prefs.keyboardLayout(getContext())==1 && !numericMode && !emojiMode){
             if(row<3){
                 if(d>0){
-                    if(col<2) col++; else if(col==2) col=3;
-                    else { row=Math.min(2,row+1); col=0; }
+                    if(col<3) col++;
+                    else col=0;
                 }else{
-                    if(col==3) col=2;
-                    else if(col>0) col--;
-                    else if(row>0){row--;col=2;}
+                    if(col>0) col--;
+                    else col=3;
                 }
                 return;
             }
             if(row==3){
-                col=Math.max(0,Math.min(nineBottom.length-1,col+d));
+                if(d>0) col=(col+1)%nineBottom.length;
+                else col=(col-1+nineBottom.length)%nineBottom.length;
                 return;
             }
         }
         int len=rowLen(row);
-        if(d>0){if(col<len-1)col++;else if(row<rowCount()-1){row++;col=0;}}
-        else {if(col>0)col--;else if(row>0){row--;col=Math.min(col,rowLen(row)-1);}}
+        if(d>0){
+            if(col<len-1) col++;
+            else col=0; // horizontal wrap on the same row
+        } else {
+            if(col>0) col--;
+            else col=len-1; // horizontal wrap on the same row
+        }
     }
     private void moveVertical(int d){
         if(section==0&&d>0){section=2;row=0;col=Math.min(rowLen(0)-1,keyForTool(col));return;}

@@ -120,24 +120,32 @@ public final class ChineseEngine {
     public boolean hasComposing() { return composing != null && !composing.isEmpty(); }
 
     public String input(String s) {
-        if (english) { return null; }
+        if (english || s == null || s.isEmpty()) return null;
         if (rime && session != 0) {
-            String lower = s.toLowerCase(Locale.US);
-            // Production path: process_key is the real Android/Rime key boundary.
-            // Do not call simulate_key_sequence here; doing both can advance the same
-            // composition twice and is the reason candidates previously disappeared.
+            // Android TV sends the soft-keyboard letters through our View rather than
+            // as hardware key events.  For this path, set_input is deliberately used
+            // instead of simulate_key_sequence: it updates Rime's composition directly
+            // and avoids depending on a platform-specific key-code translation table.
+            // This also fixes the case where the TV showed the typed Latin letter but
+            // never produced a Chinese preedit/candidate list.
             RimeNative.setAsciiMode(session, false);
-            String lastCommit = null;
-            // Android TV alphabet keys arrive as text input. Feeding them through
-            // Rime's sequence interface keeps composition and candidate generation
-            // in the same path.
-            if (lower.length() > 0) {
-                lastCommit = RimeNative.simulateKeySequence(session, lower);
+            String[] ctx = RimeNative.context(session);
+            String raw = (ctx.length > 0 && ctx[0] != null) ? ctx[0] : composing;
+            String lower = s.toLowerCase(Locale.US);
+            if (!RimeNative.setInput(session, raw + lower)) {
+                // Keep the front-end usable even if a particular Rime deployment
+                // rejects the input update. The bundled dictionary is the safe fallback.
+                composing = raw + lower;
+                localCandidates(composing);
+                publishFallback();
+                return null;
             }
             refresh();
-            return lastCommit;
+            return null;
         }
-        composing += s.toLowerCase(Locale.US); publishFallback();
+        composing += s.toLowerCase(Locale.US);
+        localCandidates(composing);
+        publishFallback();
         return null;
     }
 
@@ -156,6 +164,7 @@ public final class ChineseEngine {
         }
         if (composing.charAt(composing.length()-1) != '\'') {
             composing += "'";
+            localCandidates(composing);
             publishFallback();
         }
     }
