@@ -31,7 +31,7 @@ public class DrumstickImeService extends InputMethodService {
     private final BroadcastReceiver rimeReloadReceiver = new BroadcastReceiver(){ @Override public void onReceive(Context c, Intent i){ reloadRime(); } };
 
     @Override public void onCreate(){ super.onCreate();
-        engine = new ChineseEngine(this, (cs, pre) -> { if(view!=null) view.setCandidates(cs, pre); InputConnection ic=getCurrentInputConnection(); if(ic!=null && !engine.isEnglish()){ ic.setComposingText(pre==null?"":pre,1); } });
+        engine = new ChineseEngine(this, (cs, pre) -> new Handler(Looper.getMainLooper()).post(() -> { if(view!=null) view.setCandidates(cs, pre); InputConnection ic=getCurrentInputConnection(); if(ic!=null && engine!=null && !engine.isEnglish()){ ic.setComposingText(pre==null?"":pre,1); } }));
         if (Build.VERSION.SDK_INT >= 33) registerReceiver(rimeReloadReceiver, new IntentFilter("com.jituileet.inputmethod.RELOAD_RIME"), Context.RECEIVER_NOT_EXPORTED); else registerReceiver(rimeReloadReceiver, new IntentFilter("com.jituileet.inputmethod.RELOAD_RIME"));
         engine.setEnglish(!isChineseLanguage());
         phoneServer = new PhoneInputServer(this, text -> new Handler(Looper.getMainLooper()).post(() -> commitText(text)));
@@ -426,7 +426,7 @@ public class DrumstickImeService extends InputMethodService {
     public String phoneUrl(){ return phoneServer.getUrl(); }
     public boolean isChineseLanguagePublic(){ return isChineseLanguage(); }
     public DrumstickKeyboardView keyboardView(){ return view; }
-    public void reloadRime(){ if(engine!=null) engine.destroy(); engine=new ChineseEngine(this,(cs,pre)->{if(view!=null)view.setCandidates(cs,pre); InputConnection ic=getCurrentInputConnection(); if(ic!=null&&!engine.isEnglish()) ic.setComposingText(pre==null?"":pre,1);}); engine.setEnglish(!isChineseLanguage()); }
+    public void reloadRime(){ if(engine!=null) engine.destroy(); engine=new ChineseEngine(this,(cs,pre)->new Handler(Looper.getMainLooper()).post(()->{if(view!=null)view.setCandidates(cs,pre); InputConnection ic=getCurrentInputConnection(); if(ic!=null&&engine!=null&&!engine.isEnglish()) ic.setComposingText(pre==null?"":pre,1);})); engine.setEnglish(!isChineseLanguage()); }
     public void clearUsage(){ if(engine!=null) engine.clearUsage(); }
     public void startPhoneInput(){ if(phoneServer!=null) phoneServer.start(); }
     public void stopPhoneInput(){ if(phoneServer!=null) phoneServer.stop(); }
