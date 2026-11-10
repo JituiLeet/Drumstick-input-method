@@ -65,6 +65,10 @@ public class DrumstickImeService extends InputMethodService {
             engine.setEnglish(!isChineseLanguage());
         }
         if(view!=null){
+            // Always restore the base keyboard when Android opens a new input session.
+            // A previous Copy/Clipboard/Settings panel must never survive window dismissal.
+            activePanel=null;
+            setInputView(view);
             view.setVisibility(View.VISIBLE);
             view.resetForInputSession();
         }
