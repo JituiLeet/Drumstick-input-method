@@ -23,7 +23,7 @@ public final class RimeData {
         File user = userDir(c);
 
         if (!shared.exists() ||
-                !new File(shared, ".installed-1.0.0-rime-tv-fix3").exists()) {
+                !new File(shared, ".installed-1.0.0-rime-tv-fix4").exists()) {
 
             delete(shared);
 
