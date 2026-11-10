@@ -76,9 +76,23 @@ public final class ImeSettingsPanel extends ScrollView {
         Switch sw=new Switch(service); sw.setText(zh?"使用手机输入":"Use phone input"); sw.setChecked(Prefs.phone(service)); sw.setFocusable(true); box.addView(sw,new LinearLayout.LayoutParams(-1,64));
         TextView info=title(zh?"电视和手机连接同一 Wi‑Fi 后，在手机浏览器打开下面地址：":"Connect phone and TV to the same Wi‑Fi, then open this address in the phone browser:"); info.setTextSize(14); box.addView(info);
         TextView url=title(""); url.setTextSize(19); url.setTextColor(Prefs.dark(service)?0xFF8FD3FF:0xFF1677B7); box.addView(url);
-        Runnable refresh=()->{ if(Prefs.phone(service)){service.startPhoneInput(); url.setText(service.phoneUrl());} else url.setText(""); };
-        refresh.run();
-        sw.setOnCheckedChangeListener((v,on)->{service.setPhoneInput(on);refresh.run();});
+        final android.os.Handler handler=new android.os.Handler(android.os.Looper.getMainLooper());
+        final Runnable poll=new Runnable(){
+            @Override public void run(){
+                if(!Prefs.phone(service)){url.setText("");return;}
+                service.startPhoneInput();
+                String address=service.phoneUrl();
+                url.setText(address.isEmpty()
+                        ?(zh?"正在获取地址，请确认电视已连接 Wi-Fi 或网线":"Waiting for network address; check TV network")
+                        :address);
+                if(address.isEmpty())handler.postDelayed(this,1000);
+            }
+        };
+        poll.run();
+        sw.setOnCheckedChangeListener((v,on)->{
+            service.setPhoneInput(on);
+            if(on)poll.run();else {handler.removeCallbacks(poll);url.setText("");}
+        });
         btn(zh?"返回设置":"Back to settings",v->service.showSettingsPanel());
         postDelayed(()->sw.requestFocus(),60);
     }
