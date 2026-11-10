@@ -19,6 +19,11 @@ public final class DrumstickKeyboardView extends View {
     // 9-key follows the requested three-column layout; the bottom function row
     // is the same as the original 26-key keyboard.
     private final String[][] nine={
+            {"1","2 abc","3 def"},
+            {"4 ghi","5 jkl","6 mno"},
+            {"7 pqrs","8 tuv","9 wxyz"}
+    };
+    private final String[][] nineTokens={
             {"？！。","ABC","DEF"},
             {"GHI","JKL","MNO"},
             {"PQRS","TUV","WXYZ"}
@@ -278,7 +283,7 @@ public final class DrumstickKeyboardView extends View {
         int layout=Prefs.keyboardLayout(getContext());
         if(layout==1){
             String raw;
-            if(row<3 && col<3) raw=nine[row][col];
+            if(row<3 && col<3) raw=nineTokens[row][col];
             else if(row<3 && col==3) raw=nineSide[row];
             else if(row==3 && col>=0 && col<nineBottom.length) raw=nineBottom[col];
             else return;
