@@ -13,9 +13,9 @@ public final class ChineseEngine {
     private final ArrayList<String> candidates = new ArrayList<>();
     private final ArrayList<Integer> candidateRimeIndices = new ArrayList<>();
     private final UsageTracker usage;
-    private long session;
-    private boolean english;
-    private boolean rime;
+    private volatile long session;
+    private volatile boolean english;
+    private volatile boolean rime;
     private String composing = "";
     private final HashMap<String, ArrayList<String>> localDictionary = new HashMap<>();
     private volatile boolean localDictionaryLoaded;
@@ -28,7 +28,7 @@ public final class ChineseEngine {
 
     private void loadLocalDictionary() {
         if(localDictionaryLoaded) return;
-        localDictionaryLoaded=true;
+        HashMap<String, ArrayList<String>> loaded = new HashMap<>();
         try(InputStream in=context.getAssets().open("rime/luna_pinyin.dict.yaml");
             BufferedReader r=new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8), 32768)){
             String line; boolean data=false;
@@ -40,11 +40,12 @@ public final class ChineseEngine {
                 String[] a=line.split("\\t",2); if(a.length<2)continue;
                 String word=a[0].trim(); String py=a[1].trim().toLowerCase(Locale.US);
                 if(word.isEmpty()||py.isEmpty()||py.startsWith("#"))continue;
-                ArrayList<String> list=localDictionary.get(py);
-                if(list==null){list=new ArrayList<>();localDictionary.put(py,list);}
+                ArrayList<String> list=loaded.get(py);
+                if(list==null){list=new ArrayList<>();loaded.put(py,list);}
                 if(list.size()<64&&!list.contains(word))list.add(word);
             }
         }catch(Throwable ignored){}
+        synchronized(this){ localDictionary.clear(); localDictionary.putAll(loaded); localDictionaryLoaded=true; }
     }
 
     private void localCandidates(String input){
