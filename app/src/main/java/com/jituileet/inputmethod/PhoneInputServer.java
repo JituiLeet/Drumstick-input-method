@@ -37,6 +37,18 @@ public final class PhoneInputServer {
     public boolean isRunning(){ return running; }
     public String getUrl(){ String ip=localIp(); return running&&port>0&&!ip.isEmpty() ? "http://"+ip+":"+port+"/" : ""; }
 
+    private static String readHttpLine(InputStream in)throws IOException{
+        ByteArrayOutputStream out=new ByteArrayOutputStream();
+        int b;
+        while((b=in.read())!=-1){
+            if(b=='\n')break;
+            if(b!='\r')out.write(b);
+            if(out.size()>8192)throw new IOException("HTTP header line too long");
+        }
+        if(b==-1&&out.size()==0)return null;
+        return out.toString("UTF-8");
+    }
+
     private void loop(){
         while(running){
             try(Socket s=server.accept()){ handle(s); }
@@ -45,18 +57,28 @@ public final class PhoneInputServer {
     }
 
     private void handle(Socket s)throws IOException{
-        BufferedReader r=new BufferedReader(new InputStreamReader(s.getInputStream(),"UTF-8"));
-        String first=r.readLine(); if(first==null)return;
+        InputStream in=new BufferedInputStream(s.getInputStream());
+        String first=readHttpLine(in); if(first==null)return;
         int len=0; String line;
-        while((line=r.readLine())!=null&&!line.isEmpty()){
+        while((line=readHttpLine(in))!=null&&!line.isEmpty()){
             String z=line.toLowerCase(Locale.US);
             if(z.startsWith("content-length:"))try{len=Integer.parseInt(line.substring(15).trim());}catch(Exception ignored){}
         }
         String body="";
         if(first.startsWith("POST")&&len>0){
-            char[] b=new char[Math.min(len,65536)]; int n=r.read(b); if(n>0)body=new String(b,0,n);
+            int count=Math.min(len,1024*1024);
+            byte[] bytes=new byte[count]; int got=0;
+            while(got<count){
+                int n=in.read(bytes,got,count-got);
+                if(n<0)break;
+                got+=n;
+            }
+            if(got>0)body=new String(bytes,0,got,"UTF-8");
         }
-        if(body.startsWith("text=")){String text=URLDecoder.decode(body.substring(5),"UTF-8");if(!text.isEmpty()&&listener!=null)listener.onText(text);}
+        if(body.startsWith("text=")){
+            String text=URLDecoder.decode(body.substring(5),"UTF-8");
+            if(!text.isEmpty()&&listener!=null)listener.onText(text);
+        }
         String html="<!doctype html><meta name='viewport' content='width=device-width,initial-scale=1'><style>body{font-family:sans-serif;background:#ebecf0;padding:24px}textarea{width:100%;height:45vh;font-size:22px;box-sizing:border-box}button{font-size:20px;padding:12px 22px}</style><h2>鸡腿输入法 · 手机输入</h2><form method='post'><textarea name='text' autofocus placeholder='在这里输入文字'></textarea><p><button type='submit'>发送到电视</button></p></form>";
         byte[] data=html.getBytes("UTF-8"); OutputStream o=s.getOutputStream();
         o.write(("HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: "+data.length+"\r\nConnection: close\r\n\r\n").getBytes("UTF-8")); o.write(data); o.flush();
