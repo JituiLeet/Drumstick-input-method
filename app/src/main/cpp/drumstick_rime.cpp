@@ -88,8 +88,10 @@ Java_com_jituileet_inputmethod_RimeNative_nativeInitialize(JNIEnv* env, jclass, 
 
     bool maintenanceOk = true;
     if (gApi->start_maintenance) {
-        maintenanceOk = gApi->start_maintenance(True);
-        if (maintenanceOk && gApi->join_maintenance_thread) {
+        // A false return can mean that maintenance was not started because the
+        // data tree is already prepared. Do not treat that alone as fatal.
+        bool maintenanceStarted = gApi->start_maintenance(False);
+        if (maintenanceStarted && gApi->join_maintenance_thread) {
             gApi->join_maintenance_thread();
         }
     }
@@ -98,8 +100,8 @@ Java_com_jituileet_inputmethod_RimeNative_nativeInitialize(JNIEnv* env, jclass, 
         LOGE("Rime is still in maintenance mode after join");
         maintenanceOk = false;
     }
-    // Build/refresh prebuilt data before creating sessions. A session can be
-    // created successfully even when the requested schema was never deployed.
+    // Always attempt deployment, including when start_maintenance() reports
+    // that no maintenance job was started. Deployment is the real data check.
     if (maintenanceOk && gApi->deploy) {
         if (!gApi->deploy()) {
             LOGE("Rime deploy failed");
