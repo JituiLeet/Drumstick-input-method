@@ -231,10 +231,14 @@ public final class DrumstickKeyboardView extends View {
         }
     }
     private void moveVertical(int d){
-        if(section==0&&d>0){section=2;row=0;col=Math.min(rowLen(0)-1,keyForTool(col));return;}
+        if(section==0){
+            if(d>0){section=2;row=0;col=Math.min(rowLen(0)-1,keyForTool(col));}
+            return;
+        }
         if(section==1){
+            // The candidate strip replaces the toolbar while composing.
+            // Moving UP must not jump to invisible toolbar controls.
             if(d>0){section=2;row=0;col=0;}
-            else { section=0;col=0; }
             return;
         }
         if(section==2){
@@ -255,7 +259,11 @@ public final class DrumstickKeyboardView extends View {
             int nr=row+d;
             // UP from the first keyboard row moves to the unified top toolbar.
             // DOWN from the toolbar still returns to the keyboard/candidate area.
-            if(nr<0){section=0;col=Math.min(tools().length-1,keyForTool(col));return;}
+            if(nr<0){
+                if(!preedit.isEmpty()&&!candidates.isEmpty()){section=1;col=0;}
+                else {section=0;col=Math.min(tools().length-1,keyForTool(col));}
+                return;
+            }
             if(nr<rowCount()){
                 row=nr;
                 col=Math.min(col,rowLen(row)-1);
