@@ -131,13 +131,14 @@ public final class DrumstickKeyboardView extends View {
     }
 
     private void drawEmoji(Canvas c,float y){
-        float gap=8; int cols=8; float rh=(getHeight()-y-gap*5)/4f; float kw=(getWidth()-gap*(cols+1))/cols;
-        for(int i=0;i<32;i++){
+        float gap=8; int cols=8; float rh=(getHeight()-y-gap*6)/5f; float kw=(getWidth()-gap*(cols+1))/cols;
+        for(int i=0;i<40;i++){
             int r=i/cols,j=i%cols;
             float x=gap+j*(kw+gap), yy=y+gap+r*(rh+gap);
             boolean f=section==2&&row==r&&col==j;
-            if(i==31){ drawIconKey(c,x,yy,kw,rh,f); }
-            else { drawKey(c,emojis[i],x,yy,kw,rh,f); }
+            if(i==32){ drawIconKey(c,x,yy,kw,rh,f); }
+            else if(i<emojis.length){ drawKey(c,emojis[i],x,yy,kw,rh,f); }
+            else { drawKey(c,"",x,yy,kw,rh,f); }
         }
     }
 
@@ -166,7 +167,7 @@ public final class DrumstickKeyboardView extends View {
     private void drawAppIcon(Canvas c,float x,float y,float w,float h){p.setColor(Color.WHITE);c.drawRoundRect(x,y,x+w,y+h,6,6,p);p.setColor(0xFF4A4A4A);for(int r=0;r<3;r++)for(int j=0;j<3;j++)c.drawRoundRect(x+7+j*10,y+7+r*9,x+15+j*10,y+14+r*9,1,1,p);}
 
     private int rowCount(){
-        if(emojiMode)return 4;
+        if(emojiMode)return 5;
         int layout=Prefs.keyboardLayout(getContext());
         if(layout==1)return numericMode?symbols.length:4;
         return numericMode?symbols.length:qwerty.length;
@@ -270,7 +271,7 @@ public final class DrumstickKeyboardView extends View {
         if(section==1){int idx=candidatePage*PER_PAGE+col;if(idx>=0&&idx<candidates.size()){String out=svc.engineChoose(idx);if(out!=null&&!out.isEmpty())svc.commitEngineResult(out);}return;}
         if(emojiMode){
             int idx=row*8+col;
-            if(idx==31){ setEmojiMode(false); return; }
+            if(idx==32){ setEmojiMode(false); return; }
             if(idx>=0&&idx<emojis.length)svc.press(emojis[idx]);
             return;
         }
@@ -320,7 +321,7 @@ public final class DrumstickKeyboardView extends View {
             float y=topH;
             float gap=8;
             int cols=8;
-            float rh=(getHeight()-y-gap*5)/4f;
+            float rh=(getHeight()-y-gap*6)/5f;
             float kw=(getWidth()-gap*(cols+1))/cols;
             int r=(int)((e.getY()-y-gap)/(rh+gap));
             int cc=(int)((e.getX()-gap)/(kw+gap));
