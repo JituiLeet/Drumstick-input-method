@@ -34,8 +34,10 @@ public final class ChineseEngine {
             String line; boolean data=false;
             while((line=r.readLine())!=null){
                 String t=line.trim();
-                if(t.equals("---")){data=true;continue;}
-                if(t.equals("..."))break;
+                // Rime dictionaries put YAML metadata between --- and ... .
+                // Actual word/pinyin rows begin AFTER the ... marker.
+                if(t.equals("---")){data=false;continue;}
+                if(t.equals("...")){data=true;continue;}
                 if(!data||t.isEmpty()||t.startsWith("#"))continue;
                 String[] a=line.split("\\t",2); if(a.length<2)continue;
                 String word=a[0].trim(); String py=a[1].trim().toLowerCase(Locale.US);
