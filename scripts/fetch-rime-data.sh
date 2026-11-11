@@ -9,7 +9,11 @@ trap 'rm -rf "$TMP"' EXIT
 echo "Fetching open-source Rime prelude/luna-pinyin support files without replacing Drumstick's bundled dictionary/schema..."
 git clone --depth 1 https://github.com/rime/rime-prelude.git "$TMP/prelude"
 git clone --depth 1 https://github.com/rime/rime-luna-pinyin.git "$TMP/luna"
-cp -f "$TMP/prelude"/*.yaml "$OUT/" 2>/dev/null || true
+for f in "$TMP/prelude"/*.yaml; do
+  [ -f "$f" ] || continue
+  [ "$(basename "$f")" = "default.yaml" ] && continue
+  cp -f "$f" "$OUT/"
+done
 # Keep the bundled 1.0.0 dictionary and simplified schema under our control.
 if [ ! -f "$OUT/luna_pinyin.dict.yaml" ]; then cp -f "$TMP/luna/luna_pinyin.dict.yaml" "$OUT/"; fi
 if [ ! -f "$OUT/luna_pinyin.schema.yaml" ]; then cp -f "$TMP/luna/luna_pinyin.schema.yaml" "$OUT/"; fi
