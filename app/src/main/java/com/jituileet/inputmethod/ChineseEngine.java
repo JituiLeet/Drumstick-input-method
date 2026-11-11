@@ -31,6 +31,9 @@ public final class ChineseEngine {
                         && RimeNative.initialize(RimeData.sharedDir(context).getAbsolutePath(),
                                                  RimeData.userDir(context).getAbsolutePath());
                 if (ready) {
+                    // Re-apply the user's selected built-in/uploaded dictionary after
+                    // copying bundled data, then deploy before creating the session.
+                    RimeData.selectDictionary(context, Prefs.dict(context));
                     newSession = RimeNative.createSession();
                     if (newSession != 0) {
                         if (!RimeNative.selectSchema(newSession, "luna_pinyin_simp")) {
