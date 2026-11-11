@@ -12,6 +12,9 @@ switches:
   - name: ascii_mode
     reset: 0
     states: [中文, 西文]
+  - options: [zh_hans, zh_hant]
+    states: [简体, 繁体]
+    reset: 0
 
 engine:
   processors:
@@ -33,8 +36,14 @@ engine:
     - table_translator@custom_phrase
     - table_translator
   filters:
-    - simplifier
+    - simplifier@zh_hans
     - uniquifier
+
+zh_hans:
+  option_name: zh_hans
+  opencc_config: t2s.json
+  tips: none
+  excluded_types: [reverse_lookup]
 
 speller:
   alphabet: zyxwvutsrqponmlkjihgfedcba
