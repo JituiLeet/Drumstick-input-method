@@ -45,4 +45,10 @@ for name in CJK_Compatibility_Ideographs TSCharacters TSCharactersExt TSPhrases;
 done
 cp "$TMP/opencc/LICENSE" "$OUT/opencc/LICENSE" 2>/dev/null || true
 
+for f in t2s.json CJK_Compatibility_Ideographs.ocd2 TSCharacters.ocd2 TSCharactersExt.ocd2 TSPhrases.ocd2; do
+  test -s "$OUT/opencc/$f"
+done
+grep -q 'opencc_config: t2s.json' "$OUT/../rime/luna_pinyin_simp.schema.yaml"
+
+
 echo "Rime support data refreshed; bundled luna_pinyin.dict.yaml and luna_pinyin_simp.schema.yaml were preserved."
