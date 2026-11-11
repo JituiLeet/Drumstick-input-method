@@ -88,51 +88,54 @@ public class DrumstickImeService extends InputMethodService {
         if(view!=null){ view.setPhysical(false); view.setCandidates(java.util.Collections.<String>emptyList(),""); view.resetForInputSession(); }
     }
     @Override public boolean onKeyDown(int keyCode, KeyEvent event){
-        // The IME only owns D-pad navigation while its own input/panel UI is shown.
-        // Never consume D-pad events globally when the IME is hidden; doing so steals
-        // DOWN/UP/LEFT/RIGHT from the foreground TV application.
-        if(keyCode==KeyEvent.KEYCODE_BACK){
-            if(activePanel!=null){ restoreKeyboardView(); return true; }
-        }
+        if(keyCode==KeyEvent.KEYCODE_BACK && activePanel!=null){ restoreKeyboardView(); return true; }
+
         boolean dpad = keyCode==KeyEvent.KEYCODE_DPAD_LEFT || keyCode==KeyEvent.KEYCODE_DPAD_RIGHT
                 || keyCode==KeyEvent.KEYCODE_DPAD_UP || keyCode==KeyEvent.KEYCODE_DPAD_DOWN
                 || keyCode==KeyEvent.KEYCODE_DPAD_CENTER;
         if(dpad){
-            // Do not consume a single D-pad event unless the IME window is known to be shown.
-            // This is what lets the foreground TV app regain its remote immediately after Hide.
             if(!imeWindowActive || !isInputViewShown()) return false;
             if(activePanel!=null && activePanel.getVisibility()==View.VISIBLE) return dispatchPanelKey(event);
             if(view!=null && view.getVisibility()==View.VISIBLE) return view.dispatchKeyEvent(event);
             return super.onKeyDown(keyCode,event);
         }
 
-        // A standalone ENTER from a TV remote/editor must never establish physical-keyboard mode.
-        // Only a real typing key may establish that mode; once already active, ENTER is handled normally.
-        if(keyCode==KeyEvent.KEYCODE_ENTER && !physicalMode) return super.onKeyDown(keyCode,event);
+        boolean visible = imeWindowActive && isInputViewShown() && activePanel==null;
         boolean hardware = PhysicalKeyboardDetector.isHardwareKeyboard(event);
-        // ENTER must never be used to trigger the physical-keyboard detector.
-        // It is a normal editor action and is handled only after physical keyboard mode
-        // has already been established by an actual typing key.
-        boolean hardwareDetectKey = PhysicalKeyboardDetector.isTypingKey(event)
-                || (!engine.isEnglish() && (keyCode==KeyEvent.KEYCODE_SHIFT_LEFT || keyCode==KeyEvent.KEYCODE_SHIFT_RIGHT || keyCode==KeyEvent.KEYCODE_CAPS_LOCK));
-        if(Prefs.keyboard(this) && activePanel==null && isInputViewShown() && hardware && hardwareDetectKey){
+        boolean languageKey = keyCode==KeyEvent.KEYCODE_SHIFT_LEFT || keyCode==KeyEvent.KEYCODE_SHIFT_RIGHT;
+        boolean capsKey = keyCode==KeyEvent.KEYCODE_CAPS_LOCK;
+        boolean enterKey = keyCode==KeyEvent.KEYCODE_ENTER || keyCode==KeyEvent.KEYCODE_NUMPAD_ENTER;
+        boolean typingKey = PhysicalKeyboardDetector.isTypingKey(event) || languageKey || capsKey || enterKey;
+
+        // A physical keyboard's Enter belongs to the IME while the IME is visible.
+        // Do not let the target app handle it before Chinese composition is committed.
+        if(visible && hardware && enterKey){
+            if(!physicalMode){ physicalMode=true; if(view!=null)view.setPhysical(true); }
+            return handlePhysicalKey(keyCode,event);
+        }
+
+        if(Prefs.keyboard(this) && visible && hardware && typingKey){
             if(!physicalDetectionAnnounced){
                 physicalDetectionAnnounced=true;
-                if(Prefs.hardwareNotice(this)) Toast.makeText(this, isChineseLanguage()?"检测到实体键盘，已切换键盘输入模式":"Physical keyboard detected, switched to keyboard input mode", Toast.LENGTH_SHORT).show();
+                if(Prefs.hardwareNotice(this)) Toast.makeText(this,
+                        isChineseLanguage()?"检测到实体键盘，已切换键盘输入模式":"Physical keyboard detected, switched to keyboard input mode",
+                        Toast.LENGTH_SHORT).show();
             }
             if(!physicalMode){ physicalMode=true; if(view!=null)view.setPhysical(true); }
-            // English mode is deliberately left to Android/editor handling. The IME only
-            // consumes alphabetic input while Chinese composition is active.
-            if(engine.isEnglish()) return super.onKeyDown(keyCode,event);
-            if(keyCode==KeyEvent.KEYCODE_SHIFT_LEFT||keyCode==KeyEvent.KEYCODE_SHIFT_RIGHT){
-                try{InputConnection x=getCurrentInputConnection();if(x!=null)x.finishComposingText();}catch(Throwable ignored){}
-                engine.setEnglish(true); return super.onKeyDown(keyCode,event);
+
+            if(languageKey){
+                try{InputConnection ic=getCurrentInputConnection();if(ic!=null)ic.finishComposingText();}catch(Throwable ignored){}
+                engine.setEnglish(!engine.isEnglish());
+                caps=false;
+                return true;
             }
-            if(keyCode==KeyEvent.KEYCODE_CAPS_LOCK){ return super.onKeyDown(keyCode,event); }
-            if(keyCode==KeyEvent.KEYCODE_PAGE_UP || keyCode==KeyEvent.KEYCODE_PAGE_DOWN){
-                return view!=null && view.dispatchKeyEvent(event);
+            if(capsKey){
+                caps=!caps;
+                if(!engine.isEnglish()) engine.setEnglish(true);
+                return true;
             }
-            if((event.isCtrlPressed()) && (keyCode==KeyEvent.KEYCODE_C || keyCode==KeyEvent.KEYCODE_X || keyCode==KeyEvent.KEYCODE_A || keyCode==KeyEvent.KEYCODE_V)){
+            if(event.isCtrlPressed() && (keyCode==KeyEvent.KEYCODE_C || keyCode==KeyEvent.KEYCODE_X
+                    || keyCode==KeyEvent.KEYCODE_A || keyCode==KeyEvent.KEYCODE_V)){
                 InputConnection ic=getCurrentInputConnection();
                 if(ic!=null){
                     if(keyCode==KeyEvent.KEYCODE_C) ic.performContextMenuAction(android.R.id.copy);
@@ -142,13 +145,72 @@ public class DrumstickImeService extends InputMethodService {
                 }
                 return true;
             }
-            // Only letters enter Rime. Editing keys are handled locally so Chinese preedit
-            // can be deleted/committed without stealing ordinary punctuation handling.
-            if((keyCode>=KeyEvent.KEYCODE_A && keyCode<=KeyEvent.KEYCODE_Z)) return handlePhysicalKey(keyCode,event);
-            if(keyCode==KeyEvent.KEYCODE_DEL || keyCode==KeyEvent.KEYCODE_SPACE || keyCode==KeyEvent.KEYCODE_ENTER) return handlePhysicalKey(keyCode,event);
-            return super.onKeyDown(keyCode,event);
+            return handlePhysicalKey(keyCode,event);
         }
         return super.onKeyDown(keyCode,event);
+    }
+
+    private int physicalDigit(int keyCode){
+        if(keyCode>=KeyEvent.KEYCODE_0 && keyCode<=KeyEvent.KEYCODE_9) return keyCode-KeyEvent.KEYCODE_0;
+        if(keyCode>=KeyEvent.KEYCODE_NUMPAD_0 && keyCode<=KeyEvent.KEYCODE_NUMPAD_9) return keyCode-KeyEvent.KEYCODE_NUMPAD_0;
+        return -1;
+    }
+
+    private boolean handlePhysicalKey(int keyCode, KeyEvent event){
+        InputConnection ic=getCurrentInputConnection();
+        if(keyCode==KeyEvent.KEYCODE_DEL){
+            if(engine.hasComposing()) engine.backspace();
+            else if(ic!=null) ic.deleteSurroundingText(1,0);
+            return true;
+        }
+        if(keyCode==KeyEvent.KEYCODE_ENTER || keyCode==KeyEvent.KEYCODE_NUMPAD_ENTER){
+            if(engine.hasComposing()){
+                String out=engine.commitFirst();
+                if(out!=null&&!out.isEmpty()) commitText(out);
+                else if(ic!=null) sendEnter(ic);
+            }else if(ic!=null) sendEnter(ic);
+            return true;
+        }
+        if(keyCode==KeyEvent.KEYCODE_SPACE){
+            if(engine.hasComposing()){
+                String out=engine.commitFirst();
+                if(out!=null&&!out.isEmpty()) commitText(out);
+            }else if(ic!=null) commitText(" ");
+            return true;
+        }
+
+        int digit=physicalDigit(keyCode);
+        if(digit>=1 && digit<=9 && !engine.isEnglish() && engine.hasComposing()){
+            if(digit<=engine.candidateCount()){
+                String out=engine.choose(digit-1);
+                if(out!=null&&!out.isEmpty()) commitText(out);
+                return true;
+            }
+        }
+
+        if(keyCode>=KeyEvent.KEYCODE_A && keyCode<=KeyEvent.KEYCODE_Z){
+            if(engine.isEnglish()){
+                int unicode=event.getUnicodeChar(event.getMetaState());
+                char ch=unicode==0?(char)('a'+keyCode-KeyEvent.KEYCODE_A):(char)unicode;
+                if(caps) ch=Character.toUpperCase(ch);
+                commitText(String.valueOf(ch));
+            }else{
+                engine.input(String.valueOf((char)('a'+keyCode-KeyEvent.KEYCODE_A)));
+            }
+            return true;
+        }
+
+        int unicode=event.getUnicodeChar(event.getMetaState());
+        if(unicode!=0){
+            String text=String.valueOf((char)unicode);
+            if(!engine.isEnglish() && engine.hasComposing()){
+                String out=engine.commitFirst();
+                if(out!=null&&!out.isEmpty()) commitText(out);
+            }
+            commitText(text);
+            return true;
+        }
+        return false;
     }
 
     private boolean dispatchPanelKey(KeyEvent event){
