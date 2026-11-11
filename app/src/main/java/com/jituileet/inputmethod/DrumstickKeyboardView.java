@@ -246,7 +246,7 @@ public final class DrumstickKeyboardView extends View {
             if(emojiMode){
                 row=Math.max(0,Math.min(rowCount()-1,row+d)); return;
             }
-            if(Prefs.keyboardLayout(getContext())==1 && !numericMode && !emojiMode){
+            if(currentLayout()==1 && !numericMode && !emojiMode){
                 if(d>0){
                     if(row<2){row++;col=Math.min(col,3);}
                     else if(row==2){row=3;col=Math.min(col,nineBottom.length-1);}
