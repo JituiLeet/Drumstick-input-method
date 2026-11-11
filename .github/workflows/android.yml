@@ -4,6 +4,10 @@ name: Build Android APK
 # Build only when the user explicitly starts this workflow.
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - 'app/src/**'
+      - 'scripts/**'
 
 env:
   TRIME_REF: develop
