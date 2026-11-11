@@ -22,7 +22,6 @@ public final class ChineseEngine {
     }
 
     private void init() {
-        initializing = true;
         Thread worker = new Thread(() -> {
             boolean ready = false;
             long newSession = 0;
@@ -73,17 +72,6 @@ public final class ChineseEngine {
         worker.start();
     }
 
-    private boolean probeChineseCandidates() {
-        if (session == 0) return false;
-        try {
-            RimeNative.setInput(session, "ni");
-            String[] ctx = RimeNative.context(session);
-            boolean ok=false;
-            for(int i=1;i<ctx.length;i++){String x=ctx[i]; if(x!=null&&!x.isEmpty()){ boolean nonAscii=false; for(int j=0;j<x.length();j++) if(x.charAt(j)>127){nonAscii=true;break;} if(nonAscii){ok=true;break;}}}
-            RimeNative.setInput(session, "");
-            return ok;
-        } catch(Throwable t){ try{RimeNative.setInput(session, "");}catch(Throwable ignored){} return false; }
-    }
     public synchronized void setEnglish(boolean e) {
         english = e; composing = ""; candidates.clear(); candidateRimeIndices.clear();
         if (rime && session != 0) RimeNative.setAsciiMode(session, e);
@@ -143,10 +131,7 @@ public final class ChineseEngine {
             } catch (Throwable ignored) {}
             return;
         }
-        if (composing.charAt(composing.length()-1) != '\'') {
-            composing += "'";
-            publish();
-        }
+        // Without a Rime session there is no valid composition to split.
     }
 
     public synchronized String backspace() {
@@ -172,8 +157,7 @@ public final class ChineseEngine {
             refresh();
             return commit;
         }
-        if (index < 0 || index >= candidates.size()) return null;
-        String out = candidates.get(index); usage.record(out); composing = ""; publishFallback(); return out;
+        return null;
     }
 
     public synchronized String commitFirst() {
