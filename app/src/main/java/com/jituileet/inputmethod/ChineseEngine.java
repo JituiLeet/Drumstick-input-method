@@ -164,6 +164,7 @@ public final class ChineseEngine {
     public synchronized String commitFirst() {
         if (rime && session != 0) {
             String commit = RimeNative.selectCandidate(session, 0);
+            if(commit!=null&&!commit.isEmpty()) usage.record(commit);
             refresh(); return commit;
         }
         return null;
