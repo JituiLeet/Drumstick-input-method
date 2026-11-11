@@ -7,7 +7,7 @@ import java.util.*;
 /** TV-first keyboard with a unified toolbar/candidate strip and large 9-key layout. */
 public final class DrumstickKeyboardView extends View {
     private final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
-    private int bg=0xFFEBECF0, fg=0xFF202124; private boolean dark, physical, mic=true, numericMode, emojiMode;
+    private int bg=0xFFEBECF0, fg=0xFF202124; private boolean dark, physical, mic=true, numericMode, emojiMode, englishLayout;
     private String preedit=""; private List<String> candidates=Collections.emptyList(); private final DrumstickImeService svc;
     private int section=2,row=0,col=0,candidatePage=0; private static final int PER_PAGE=6;
     private final String[][] qwerty={
@@ -55,10 +55,11 @@ public final class DrumstickKeyboardView extends View {
     /** Reset transient UI state whenever Android starts a new IME session. */
     public void resetForInputSession(){
         // Re-enter the selected 26-key or 9-key base keyboard. Never restore transient pages.
-        emojiMode=false; numericMode=false; section=2; row=0; col=0; candidatePage=0;
+        emojiMode=false; numericMode=false; englishLayout=false; section=2; row=0; col=0; candidatePage=0;
         invalidate(); requestFocus();
     }
-    public void setKeyboardLayout(int mode){numericMode=false;emojiMode=false;if(mode==0||mode==1)Prefs.keyboardLayout(getContext(),mode);section=2;row=0;col=0;candidatePage=0;invalidate();requestFocus();}
+    public void setKeyboardLayout(int mode){numericMode=false;emojiMode=false;englishLayout=(mode==2);if(mode==0||mode==1)Prefs.keyboardLayout(getContext(),mode);section=2;row=0;col=0;candidatePage=0;invalidate();requestFocus();}
+    private int currentLayout(){return englishLayout?0:Prefs.keyboardLayout(getContext());}
     public void setCandidates(List<String> c,String pre){
         String nextPre=pre==null?"":pre; boolean changed=!nextPre.equals(preedit); candidates=c==null?Collections.<String>emptyList():new ArrayList<>(c); preedit=nextPre;
         if(changed)candidatePage=0; int max=Math.max(0,(candidates.size()-1)/PER_PAGE); if(candidatePage>max)candidatePage=max;
@@ -73,7 +74,7 @@ public final class DrumstickKeyboardView extends View {
         if(!preedit.isEmpty()&&!candidates.isEmpty())drawCandidates(c,topH);else drawTools(c,topH);
         float y=topH;
         if(emojiMode){drawEmojiToolbar(c,topH); drawEmoji(c,y); return;}
-        int layout=Prefs.keyboardLayout(getContext());
+        int layout=currentLayout();
         if(layout==1){drawNine(c,y);return;}
         String[][] rr=numericMode?symbols:qwerty;
         float rh=(getHeight()-y)/rr.length;
@@ -173,13 +174,13 @@ public final class DrumstickKeyboardView extends View {
 
     private int rowCount(){
         if(emojiMode)return 5;
-        int layout=Prefs.keyboardLayout(getContext());
+        int layout=currentLayout();
         if(layout==1)return numericMode?symbols.length:4;
         return numericMode?symbols.length:qwerty.length;
     }
     private int rowLen(int r){
         if(emojiMode)return 8;
-        int layout=Prefs.keyboardLayout(getContext());
+        int layout=currentLayout();
         if(layout==1){
             if(numericMode) return symbols[r].length;
             return r<3?3:sevenBottomLength();
@@ -204,7 +205,7 @@ public final class DrumstickKeyboardView extends View {
     private void moveHorizontal(int d){
         if(section==0){col=Math.max(0,Math.min(tools().length-1,col+d));return;}
         if(section==1){int count=Math.min(PER_PAGE,candidates.size()-candidatePage*PER_PAGE);if(count<=0)return;if(d>0&&col==count-1&&candidatePage<(candidates.size()-1)/PER_PAGE){svc.engineChangePage(false);candidatePage++;col=0;}else if(d<0&&col==0&&candidatePage>0){svc.engineChangePage(true);candidatePage--;col=0;}else col=Math.max(0,Math.min(count-1,col+d));return;}
-        if(Prefs.keyboardLayout(getContext())==1 && !numericMode && !emojiMode){
+        if(currentLayout()==1 && !numericMode && !emojiMode){
             if(row<3){
                 if(d>0){
                     if(col<3) col++;
@@ -288,7 +289,7 @@ public final class DrumstickKeyboardView extends View {
             if(idx>=0&&idx<emojis.length)svc.press(emojis[idx]);
             return;
         }
-        int layout=Prefs.keyboardLayout(getContext());
+        int layout=currentLayout();
         if(layout==1){
             String raw;
             if(row<3 && col<3) raw=nineTokens[row][col];
@@ -346,7 +347,7 @@ public final class DrumstickKeyboardView extends View {
             }
             return true;
         }
-        int layout=Prefs.keyboardLayout(getContext());
+        int layout=currentLayout();
         float y=topH;
         if(layout==1){
             if(numericMode){
