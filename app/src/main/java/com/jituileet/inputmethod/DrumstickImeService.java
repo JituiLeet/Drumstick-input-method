@@ -21,7 +21,6 @@ public class DrumstickImeService extends InputMethodService {
     private ChineseEngine engine;
     private PhoneInputServer phoneServer;
     private boolean physicalMode;
-    private boolean shift;
     private boolean caps;
     private boolean numericMode;
     private boolean physicalDetectionAnnounced;
@@ -59,7 +58,6 @@ public class DrumstickImeService extends InputMethodService {
         super.onStartInputView(info,restarting);
         // A new IME window starts from the persisted base keyboard mode only.
         // Never restore transient UI such as Emoji, symbols, or the previous focus.
-        int layout=Prefs.keyboardLayout(this);
         if(engine!=null){
             engine.resetComposition();
             engine.setEnglish(!isChineseLanguage());
@@ -82,7 +80,7 @@ public class DrumstickImeService extends InputMethodService {
     }
     @Override public void onStartInput(android.view.inputmethod.EditorInfo attribute, boolean restarting){
         super.onStartInput(attribute,restarting); setExtractViewShown(false);
-        physicalMode=false; physicalDetectionAnnounced=false; shift=false; caps=false; numericMode=false;
+        physicalMode=false; physicalDetectionAnnounced=false; caps=false; numericMode=false;
         try{InputConnection ic=getCurrentInputConnection();if(ic!=null)ic.finishComposingText();}catch(Throwable ignored){}
         if(engine!=null){ engine.resetComposition(); engine.setEnglish(!isChineseLanguage()); }
         if(view!=null){ view.setPhysical(false); view.setCandidates(java.util.Collections.<String>emptyList(),""); view.resetForInputSession(); }
@@ -109,7 +107,7 @@ public class DrumstickImeService extends InputMethodService {
 
         // A physical keyboard's Enter belongs to the IME while the IME is visible.
         // Do not let the target app handle it before Chinese composition is committed.
-        if(visible && hardware && enterKey){
+        if(Prefs.keyboard(this) && visible && hardware && enterKey){
             if(!physicalMode){ physicalMode=true; if(view!=null)view.setPhysical(true); }
             return handlePhysicalKey(keyCode,event);
         }
@@ -291,6 +289,16 @@ public class DrumstickImeService extends InputMethodService {
     }
 
     @Override public boolean onKeyUp(int keyCode, KeyEvent event){
+        if(imeWindowActive && isInputViewShown() && Prefs.keyboard(this)
+                && PhysicalKeyboardDetector.isHardwareKeyboard(event)
+                && (PhysicalKeyboardDetector.isTypingKey(event)
+                    || keyCode==KeyEvent.KEYCODE_SHIFT_LEFT
+                    || keyCode==KeyEvent.KEYCODE_SHIFT_RIGHT
+                    || keyCode==KeyEvent.KEYCODE_CAPS_LOCK
+                    || keyCode==KeyEvent.KEYCODE_ENTER
+                    || keyCode==KeyEvent.KEYCODE_NUMPAD_ENTER)){
+            return true;
+        }
         return super.onKeyUp(keyCode,event);
     }
     private void sendEnter(InputConnection ic){ic.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_ENTER));ic.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP,KeyEvent.KEYCODE_ENTER));}
