@@ -293,30 +293,6 @@ public class DrumstickImeService extends InputMethodService {
     @Override public boolean onKeyUp(int keyCode, KeyEvent event){
         return super.onKeyUp(keyCode,event);
     }
-    private boolean isPhysicalTextKey(int k, KeyEvent e){ return (k>=KeyEvent.KEYCODE_A && k<=KeyEvent.KEYCODE_Z) || k==KeyEvent.KEYCODE_SPACE || k==KeyEvent.KEYCODE_DEL || k==KeyEvent.KEYCODE_ENTER || k==KeyEvent.KEYCODE_SHIFT_LEFT || k==KeyEvent.KEYCODE_SHIFT_RIGHT || k==KeyEvent.KEYCODE_CAPS_LOCK || k==KeyEvent.KEYCODE_COMMA || k==KeyEvent.KEYCODE_PERIOD || k==KeyEvent.KEYCODE_APOSTROPHE || k==KeyEvent.KEYCODE_SEMICOLON || k==KeyEvent.KEYCODE_SLASH || k==KeyEvent.KEYCODE_MINUS || k==KeyEvent.KEYCODE_EQUALS || (k>=KeyEvent.KEYCODE_0 && k<=KeyEvent.KEYCODE_9); }
-    private boolean handlePhysicalKey(int k, KeyEvent e){
-        InputConnection ic=getCurrentInputConnection();
-        if(k==KeyEvent.KEYCODE_DEL){
-            if(engine.hasComposing()) engine.backspace(); else if(ic!=null) ic.deleteSurroundingText(1,0);
-            return true;
-        }
-        if(k==KeyEvent.KEYCODE_ENTER){
-            if(engine.hasComposing()){ String out=engine.commitFirst(); if(out!=null&&!out.isEmpty()) commitText(out); else if(ic!=null) sendEnter(ic); }
-            else if(ic!=null) sendEnter(ic);
-            return true;
-        }
-        if(k==KeyEvent.KEYCODE_SPACE){
-            if(engine.hasComposing()){ String out=engine.commitFirst(); if(out!=null&&!out.isEmpty()) commitText(out); }
-            else if(ic!=null) commitText(" ");
-            return true;
-        }
-        if(k>=KeyEvent.KEYCODE_A && k<=KeyEvent.KEYCODE_Z){
-            String letter=String.valueOf((char)('a'+(k-KeyEvent.KEYCODE_A)));
-            engine.input(letter);
-            return true;
-        }
-        return false;
-    }
     private void sendEnter(InputConnection ic){ic.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_ENTER));ic.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP,KeyEvent.KEYCODE_ENTER));}
 
     public void moveCursor(int direction){
