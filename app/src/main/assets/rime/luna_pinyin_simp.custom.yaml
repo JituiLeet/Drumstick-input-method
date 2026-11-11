@@ -1,3 +1,4 @@
 patch:
   engine/filters:
+    - simplifier@zh_hans
     - uniquifier
