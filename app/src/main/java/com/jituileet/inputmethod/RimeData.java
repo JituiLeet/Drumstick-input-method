@@ -29,7 +29,7 @@ public final class RimeData {
 
             copyAssetTree(c, "rime", shared);
 
-            new File(shared, ".installed-1.0.0-rime-tv-fix3").createNewFile();
+            new File(shared, ".installed-1.0.0-rime-tv-fix4").createNewFile();
         }
 
         if (!user.exists()) {
@@ -62,6 +62,7 @@ public final class RimeData {
                         (
                                 "patch:\n" +
                                 "  engine/filters:\n" +
+                                "    - simplifier@zh_hans\n" +
                                 "    - uniquifier\n"
                         ).getBytes(java.nio.charset.StandardCharsets.UTF_8)
                 );
@@ -166,6 +167,7 @@ public final class RimeData {
         String patch =
                 "patch:\n" +
                 "  engine/filters:\n" +
+                "    - simplifier@zh_hans\n" +
                 "    - uniquifier\n" +
                 "  translator/dictionary: "
                 + dictionary +
