@@ -3,7 +3,7 @@ package com.jituileet.inputmethod;
 import android.content.Context;
 import java.util.*;
 
-/** Real Rime-backed Chinese engine with a small fallback only when the native runtime is unavailable. */
+/** Rime-backed Chinese engine. Candidate suggestions come exclusively from Rime. */
 public final class ChineseEngine {
     public interface Listener { void onCandidates(List<String> candidates, String preedit); }
     private final Context context;
@@ -50,7 +50,6 @@ public final class ChineseEngine {
             synchronized (ChineseEngine.this) {
                 session = newSession;
                 rime = ready && newSession != 0;
-                initializing = false;
                 if (rime) {
                     try {
                         RimeNative.setAsciiMode(session, english);
@@ -146,7 +145,7 @@ public final class ChineseEngine {
             return null;
         }
         if (!composing.isEmpty()) composing = composing.substring(0, composing.length()-1);
-        publishFallback(); return null;
+        publish(); return null;
     }
 
     public synchronized String choose(int index) {
