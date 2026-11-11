@@ -21,12 +21,27 @@ if [ ! -f "$OUT/luna_pinyin.yaml" ] && [ -f "$TMP/luna/luna_pinyin.yaml" ]; then
 cp -f "$TMP/luna"/*.txt "$OUT/" 2>/dev/null || true
 
 echo "Fetching OpenCC Traditional-to-Simplified conversion data..."
-git clone --depth 1 https://github.com/BYVoid/OpenCC.git "$TMP/opencc"
+git clone --depth 1 --recurse-submodules https://github.com/BYVoid/OpenCC.git "$TMP/opencc"
+OPENCC_BUILD="$TMP/opencc-build"
+cmake -S "$TMP/opencc" -B "$OPENCC_BUILD" \
+  -DBUILD_SHARED_LIBS=OFF \
+  -DOPENCC_BUILD_TOOLS=ON \
+  -DOPENCC_BUILD_DATA=OFF \
+  -DOPENCC_ENABLE_INSTALL=OFF \
+  -DENABLE_GTEST=OFF \
+  -DENABLE_BENCHMARK=OFF
+cmake --build "$OPENCC_BUILD" --target opencc_dict --parallel
+OPENCC_DICT="$(find "$OPENCC_BUILD" -type f -name opencc_dict -perm -111 -print -quit)"
+test -n "$OPENCC_DICT"
 mkdir -p "$OUT/opencc"
 cp "$TMP/opencc/data/config/t2s.json" "$OUT/opencc/t2s.json"
-for f in CJK_Compatibility_Ideographs.ocd2 TSPhrases.ocd2 TSCharactersExt.ocd2 TSCharacters.ocd2; do
-  test -s "$TMP/opencc/data/dictionary/$f"
-  cp "$TMP/opencc/data/dictionary/$f" "$OUT/opencc/$f"
+python3 "$TMP/opencc/data/scripts/extract_tofu_risk.py" \
+  "$TMP/opencc/data/dictionary/TSCharacters.txt" "$OPENCC_BUILD/TSCharactersExt.txt"
+for name in CJK_Compatibility_Ideographs TSCharacters TSCharactersExt TSPhrases; do
+  input="$TMP/opencc/data/dictionary/$name.txt"
+  [ "$name" != "TSCharactersExt" ] || input="$OPENCC_BUILD/TSCharactersExt.txt"
+  test -s "$input"
+  "$OPENCC_DICT" --input "$input" --output "$OUT/opencc/$name.ocd2" --from text --to ocd2
 done
 cp "$TMP/opencc/LICENSE" "$OUT/opencc/LICENSE" 2>/dev/null || true
 
