@@ -111,8 +111,10 @@ public final class ChineseEngine {
             refresh();
             return null;
         }
-        // Rime is not ready: do not synthesize candidates from an approximate
-        // prefix dictionary. Keep the IME responsive and show no false suggestions.
+        // Preserve keystrokes while the asynchronous Rime startup is still running.
+        // This is only pending composition text; no local dictionary suggestions are
+        // generated. The text is submitted to Rime as soon as its session is ready.
+        composing += s.toLowerCase(Locale.US);
         publish();
         return null;
     }
