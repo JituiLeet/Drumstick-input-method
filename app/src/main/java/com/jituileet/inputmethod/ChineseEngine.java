@@ -1,8 +1,6 @@
 package com.jituileet.inputmethod;
 
 import android.content.Context;
-import java.io.*;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 /** Real Rime-backed Chinese engine with a small fallback only when the native runtime is unavailable. */
@@ -17,59 +15,10 @@ public final class ChineseEngine {
     private volatile boolean english;
     private volatile boolean rime;
     private String composing = "";
-    private final HashMap<String, ArrayList<String>> localDictionary = new HashMap<>();
-    private volatile boolean localDictionaryLoaded;
-    private volatile boolean initializing;
 
     public ChineseEngine(Context c, Listener l) {
         context = c.getApplicationContext(); listener = l; usage = new UsageTracker(context);
         init();
-    }
-
-    private void loadLocalDictionary() {
-        if(localDictionaryLoaded) return;
-        HashMap<String, ArrayList<String>> loaded = new HashMap<>();
-        try(InputStream in=context.getAssets().open("rime/luna_pinyin.dict.yaml");
-            BufferedReader r=new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8), 32768)){
-            String line; boolean data=false;
-            while((line=r.readLine())!=null){
-                String t=line.trim();
-                // Rime dictionaries put YAML metadata between --- and ... .
-                // Actual word/pinyin rows begin AFTER the ... marker.
-                if(t.equals("---")){data=false;continue;}
-                if(t.equals("...")){data=true;continue;}
-                if(!data||t.isEmpty()||t.startsWith("#"))continue;
-                String[] a=line.split("\\t",2); if(a.length<2)continue;
-                String word=a[0].trim(); String py=a[1].trim().toLowerCase(Locale.US);
-                if(word.isEmpty()||py.isEmpty()||py.startsWith("#"))continue;
-                ArrayList<String> list=loaded.get(py);
-                if(list==null){list=new ArrayList<>();loaded.put(py,list);}
-                if(list.size()<64&&!list.contains(word))list.add(word);
-            }
-        }catch(Throwable ignored){}
-        synchronized(this){ localDictionary.clear(); localDictionary.putAll(loaded); localDictionaryLoaded=true; }
-    }
-
-    private void localCandidates(String input){
-        candidates.clear(); candidateRimeIndices.clear();
-        if(input==null||input.trim().isEmpty())return;
-        String q=input.trim().toLowerCase(Locale.US);
-        for(Map.Entry<String,ArrayList<String>> e:localDictionary.entrySet()){
-            if(!e.getKey().startsWith(q))continue;
-            for(String word:e.getValue()){
-                if(!candidates.contains(word)){
-                    candidates.add(word); candidateRimeIndices.add(-1);
-                    if(candidates.size()>=48)break;
-                }
-            }
-            if(candidates.size()>=48)break;
-        }
-        for(int i=0;i<candidates.size();i++)for(int j=i+1;j<candidates.size();j++){
-            if(usage.score(candidates.get(j))>usage.score(candidates.get(i))){
-                String t=candidates.get(i);candidates.set(i,candidates.get(j));candidates.set(j,t);
-                Integer ti=candidateRimeIndices.get(i);candidateRimeIndices.set(i,candidateRimeIndices.get(j));candidateRimeIndices.set(j,ti);
-            }
-        }
     }
 
     private void init() {
@@ -78,17 +27,18 @@ public final class ChineseEngine {
             boolean ready = false;
             long newSession = 0;
             try {
-                loadLocalDictionary();
                 RimeData.ensure(context);
                 ready = RimeNative.available()
                         && RimeNative.initialize(RimeData.sharedDir(context).getAbsolutePath(),
                                                  RimeData.userDir(context).getAbsolutePath());
                 if (ready) {
-                    RimeNative.deploy();
                     newSession = RimeNative.createSession();
                     if (newSession != 0) {
                         if (!RimeNative.selectSchema(newSession, "luna_pinyin_simp")) {
                             android.util.Log.e("DrumstickRime", "Could not select luna_pinyin_simp");
+                            RimeNative.destroySession(newSession);
+                            newSession = 0;
+                            ready = false;
                         }
                     } else {
                         ready = false;
@@ -112,12 +62,10 @@ public final class ChineseEngine {
                         try { RimeNative.destroySession(session); } catch (Throwable ignored) {}
                         session = 0;
                         rime = false;
-                        localCandidates(composing);
-                        publishFallback();
+                        candidates.clear(); candidateRimeIndices.clear(); publish();
                     }
                 } else {
-                    localCandidates(composing);
-                    publishFallback();
+                    candidates.clear(); candidateRimeIndices.clear(); composing = ""; publish();
                 }
             }
         }, "drumstick-rime-init");
@@ -148,7 +96,8 @@ public final class ChineseEngine {
         if (rime && session != 0) { try { RimeNative.setInput(session, ""); } catch (Throwable ignored) {} }
         composing = ""; candidates.clear(); candidateRimeIndices.clear(); publish();
     }
-    public boolean hasComposing() { return composing != null && !composing.isEmpty(); }
+    public synchronized boolean hasComposing() { return composing != null && !composing.isEmpty(); }
+    public synchronized int candidateCount() { return candidates.size(); }
 
     public synchronized String input(String s) {
         if (english || s == null || s.isEmpty()) return null;
@@ -164,19 +113,20 @@ public final class ChineseEngine {
             String raw = (ctx.length > 0 && ctx[0] != null) ? ctx[0] : composing;
             String lower = s.toLowerCase(Locale.US);
             if (!RimeNative.setInput(session, raw + lower)) {
-                // Keep the front-end usable even if a particular Rime deployment
-                // rejects the input update. The bundled dictionary is the safe fallback.
-                composing = raw + lower;
-                localCandidates(composing);
-                publishFallback();
+                // Candidate data must come from Rime only. If Rime rejects the
+                // composition update, clear the stale menu instead of inventing results.
+                composing = raw;
+                candidates.clear();
+                candidateRimeIndices.clear();
+                publish();
                 return null;
             }
             refresh();
             return null;
         }
-        composing += s.toLowerCase(Locale.US);
-        localCandidates(composing);
-        publishFallback();
+        // Rime is not ready: do not synthesize candidates from an approximate
+        // prefix dictionary. Keep the IME responsive and show no false suggestions.
+        publish();
         return null;
     }
 
@@ -195,8 +145,7 @@ public final class ChineseEngine {
         }
         if (composing.charAt(composing.length()-1) != '\'') {
             composing += "'";
-            localCandidates(composing);
-            publishFallback();
+            publish();
         }
     }
 
@@ -216,9 +165,6 @@ public final class ChineseEngine {
     }
 
     public synchronized String choose(int index) {
-        if (index >= 0 && index < candidateRimeIndices.size() && candidateRimeIndices.get(index) < 0) {
-            String out=candidates.get(index); usage.record(out); if(rime&&session!=0) RimeNative.setInput(session,""); refresh(); return out;
-        }
         if (rime && session != 0) {
             int rimeIndex = (index >= 0 && index < candidateRimeIndices.size()) ? candidateRimeIndices.get(index) : index;
             String commit = RimeNative.selectCandidate(session, rimeIndex);
@@ -235,7 +181,7 @@ public final class ChineseEngine {
             String commit = RimeNative.selectCandidate(session, 0);
             refresh(); return commit;
         }
-        String s = candidates.isEmpty()?composing:candidates.get(0); usage.record(s); composing = ""; publishFallback(); return s;
+        return null;
     }
 
     public synchronized void refresh() {
@@ -247,8 +193,6 @@ public final class ChineseEngine {
         ArrayList<String> raw = new ArrayList<>();
         ArrayList<Integer> rawIndices = new ArrayList<>();
         for (int i=1;i<ctx.length;i++) if (ctx[i] != null && !ctx[i].isEmpty()) { raw.add(ctx[i]); rawIndices.add(i-1); }
-        boolean chineseCandidate=false; for(String x:raw){for(int q=0;q<x.length();q++){if(x.charAt(q)>127){chineseCandidate=true;break;}}if(chineseCandidate)break;}
-        if(!chineseCandidate && !composing.isEmpty()) { localCandidates(composing); listener.onCandidates(new ArrayList<>(candidates), composing); return; }
         for (int pass=0; pass<raw.size(); pass++) for (int j=0; j+1<raw.size(); j++) {
             if (usage.count(raw.get(j+1)) > usage.count(raw.get(j))) {
                 String t=raw.get(j); raw.set(j,raw.get(j+1)); raw.set(j+1,t);
@@ -278,9 +222,4 @@ public final class ChineseEngine {
     }
 
     private void publish() { listener.onCandidates(new ArrayList<>(candidates), composing); }
-    private void publishFallback() {
-        // localCandidates() has already populated the fallback list.
-        // Do not erase it immediately before notifying the keyboard.
-        listener.onCandidates(new ArrayList<>(candidates), composing);
-    }
 }
