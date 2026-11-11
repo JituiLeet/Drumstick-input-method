@@ -108,7 +108,12 @@ public class DrumstickImeService extends InputMethodService {
         // A physical keyboard's Enter belongs to the IME while the IME is visible.
         // Do not let the target app handle it before Chinese composition is committed.
         if(Prefs.keyboard(this) && visible && hardware && enterKey){
-            if(!physicalMode){ physicalMode=true; if(view!=null)view.setPhysical(true); }
+            // Before physical typing mode starts, Enter activates the currently
+            // focused on-screen IME key instead of being forwarded to the editor.
+            if(engine!=null && engine.hasComposing()) return handlePhysicalKey(keyCode,event);
+            if(!physicalMode && view!=null && view.getVisibility()==View.VISIBLE){
+                return view.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_DPAD_CENTER));
+            }
             return handlePhysicalKey(keyCode,event);
         }
 
